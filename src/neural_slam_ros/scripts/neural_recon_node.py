@@ -160,15 +160,22 @@ class NeuralReconNode(Node):
         
         # Setup NeuralRecon
         try:
-            update_config(cfg, config_file)
+            self.get_logger().info(f"Loading NeuralRecon config from {config_file}")
+            # Create a simple namespace object to mimic argparse structure
+            class Args:
+                def __init__(self, cfg_path, output_dir):
+                    self.cfg = cfg_path
+                    # Add output_dir to opts list in the format ["KEY", "VALUE"]
+                    self.opts = ['OUTPUT_DIR', output_dir]
+            
+            args = Args(config_file, self.output_dir)
+            update_config(cfg, args)
         except Exception as e:
             self.get_logger().error(f"Failed to load NeuralRecon config: {e}")
             raise
         
-        # Set paths
-        cfg.OUTPUT_DIR = self.output_dir
-        
         # Create output directory
+        print(cfg)
         os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
         
         # Limit GPU memory usage if specified
@@ -193,12 +200,12 @@ class NeuralReconNode(Node):
         
         # Initialize model
         self.get_logger().info("Initializing NeuralRecon model...")
-        try:
-            self.model = NeuralRecon(cfg).cuda().eval()
-        except Exception as e:
-            self.get_logger().error(f"Failed to initialize NeuralRecon model: {e}")
-            self.get_logger().error(traceback.format_exc())
-            raise
+        # try:
+        self.model = NeuralRecon(cfg).cuda().eval()
+        # except Exception as e:
+        #     self.get_logger().error(f"Failed to initialize NeuralRecon model: {e}")
+        #     self.get_logger().error(traceback.format_exc())
+        #     raise
         
         # Load checkpoint
         if os.path.exists(cfg.LOGDIR):
@@ -296,7 +303,14 @@ class NeuralReconNode(Node):
         # Parse YAML file to extract camera intrinsics
         try:
             with open(camera_config, 'r') as f:
-                config = yaml.safe_load(f)
+                content = f.read()
+                # Skip the %YAML:1.0 directive if present
+                if content.strip().startswith('%YAML'):
+                    # Find the first newline and skip everything before it
+                    first_newline = content.find('\n')
+                    if first_newline != -1:
+                        content = content[first_newline+1:]
+                config = yaml.safe_load(content)
             
             # Check for Camera1 fields first (monocular-inertial format)
             if 'Camera1.fx' in config:

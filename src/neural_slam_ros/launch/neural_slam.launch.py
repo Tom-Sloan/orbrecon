@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, RegisterEventHandler, EmitEvent
@@ -8,6 +9,46 @@ from launch.events import Shutdown
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
+# Define helpers for config loading directly in launch file
+class OpenCVMatrix:
+    def __init__(self, rows=4, cols=4, dt="f", data=None):
+        self.rows = rows
+        self.cols = cols
+        self.dt = dt
+        self.data = data if data is not None else []
+
+def opencv_matrix_constructor(loader, node):
+    """Parse a YAML map with tag !!opencv-matrix into an OpenCVMatrix object."""
+    mapping = loader.construct_mapping(node, deep=True)
+    return OpenCVMatrix(**mapping)
+
+def load_drone_config(path):
+    """
+    Load drone configuration from YAML file, handling OpenCV matrix format.
+    """
+    # Create a custom loader that can handle !!opencv-matrix
+    class OpenCVLoader(yaml.SafeLoader):
+        pass
+    
+    # Register the constructor for !!opencv-matrix
+    OpenCVLoader.add_constructor('!!opencv-matrix', opencv_matrix_constructor)
+    
+    try:
+        with open(path, 'r') as f:
+            content = f.read()
+            # Skip the %YAML:1.0 directive if present
+            if content.strip().startswith('%YAML'):
+                # Find the first newline and skip everything before it
+                first_newline = content.find('\n')
+                if first_newline != -1:
+                    content = content[first_newline+1:]
+            return yaml.load(content, Loader=OpenCVLoader)
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        return None
 
 
 def generate_launch_description():
@@ -101,7 +142,7 @@ def generate_launch_description():
     # Performance tuning arguments
     declare_gpu_memory_fraction = DeclareLaunchArgument(
         'gpu_memory_fraction',
-        default_value='0.8',
+        default_value='1.0',
         description='Fraction of GPU memory to use (0.0-1.0)'
     )
     
@@ -129,17 +170,20 @@ def generate_launch_description():
         description='Reset SLAM system after consecutive tracking failures'
     )
     
-    # Set settings file path based on IMU usage
-    settings_file_path = os.path.join(
-        orb_slam_dir, 
-        'orb_slam3', 
+    # Load the appropriate config file
+    config_path = os.path.join(
+        get_package_share_directory('neural_slam_ros'),
         'config',
-        'Monocular-Inertial' if LaunchConfiguration('use_imu').perform(None) == 'true' else 'Monocular',
-        f"{LaunchConfiguration('settings_type').perform(None)}.yaml"
+        'EuRoC_mono_inertial.yaml' if use_imu == 'true' else 'EuRoC_mono.yaml'
     )
     
+    # Load config with OpenCV matrix support
+    config = load_drone_config(config_path)
+    if config is None:
+        raise RuntimeError(f"Failed to load configuration from {config_path}")
+    
     # Path to neural reconstruction config
-    neural_config_path = os.path.join(package_dir, 'config', LaunchConfiguration('config_file').perform(None))
+    neural_config_path = PathJoinSubstitution([package_dir, 'config', config_file])
     
     # ORB-SLAM3 node
     orbslam_node = Node(
@@ -148,7 +192,7 @@ def generate_launch_description():
         name='neural_recon_bridge',
         parameters=[{
             'voc_file_path': voc_file_path,
-            'settings_file_path': settings_file_path,
+            'settings_file_path': config_path,
             'enable_pangolin': enable_pangolin,
             'image_topic': image_topic,
             'imu_topic': imu_topic,
@@ -168,7 +212,7 @@ def generate_launch_description():
         name='neural_recon',
         parameters=[{
             'config_file': neural_config_path,
-            'camera_config': settings_file_path,
+            'camera_config': config_path,
             'save_interval': save_interval,
             'show_visualization': enable_visualization,
             'output_dir': output_dir,
