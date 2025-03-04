@@ -3,8 +3,10 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, RegisterEventHandler, EmitEvent
+from launch.events import Shutdown
+from launch.event_handlers import OnProcessExit
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
 
@@ -17,23 +19,41 @@ def generate_launch_description():
     
     # Path to vocabulary and settings files
     voc_file_path = os.path.join(orb_slam_dir, 'orb_slam3', 'Vocabulary', 'ORBvoc.txt.bin')
-    settings_file_path = os.path.join(orb_slam_dir, 'orb_slam3', 'config', 'Monocular', 'EuRoC.yaml')
-    
-    # Path to neural reconstruction config
-    neural_config_path = os.path.join(package_dir, 'config', 'neuralrecon.yaml')
     
     # Launch arguments
+    use_imu = LaunchConfiguration('use_imu')
     image_topic = LaunchConfiguration('image_topic')
+    imu_topic = LaunchConfiguration('imu_topic')
     enable_pangolin = LaunchConfiguration('enable_pangolin')
     enable_visualization = LaunchConfiguration('enable_visualization')
+    visualize_trajectory = LaunchConfiguration('visualize_trajectory')
     save_interval = LaunchConfiguration('save_interval')
     output_dir = LaunchConfiguration('output_dir')
+    settings_type = LaunchConfiguration('settings_type')
+    config_file = LaunchConfiguration('config_file')
+    gpu_memory_fraction = LaunchConfiguration('gpu_memory_fraction')
+    processing_rate = LaunchConfiguration('processing_rate')
+    use_thread = LaunchConfiguration('use_thread')
+    max_batch_size = LaunchConfiguration('max_batch_size')
+    reset_on_failure = LaunchConfiguration('reset_on_failure')
     
-    # Declare arguments
+    # Declare basic arguments
+    declare_use_imu = DeclareLaunchArgument(
+        'use_imu',
+        default_value='true',
+        description='Use IMU data for better pose estimation'
+    )
+    
     declare_image_topic = DeclareLaunchArgument(
         'image_topic',
         default_value='/camera/image_raw',
         description='Image topic to subscribe to'
+    )
+    
+    declare_imu_topic = DeclareLaunchArgument(
+        'imu_topic',
+        default_value='/imu/data',
+        description='IMU topic to subscribe to'
     )
     
     declare_enable_pangolin = DeclareLaunchArgument(
@@ -48,6 +68,12 @@ def generate_launch_description():
         description='Enable NeuralRecon visualization'
     )
     
+    declare_visualize_trajectory = DeclareLaunchArgument(
+        'visualize_trajectory',
+        default_value='true',
+        description='Visualize camera trajectory'
+    )
+    
     declare_save_interval = DeclareLaunchArgument(
         'save_interval',
         default_value='50',
@@ -60,6 +86,61 @@ def generate_launch_description():
         description='Output directory for saving reconstructions'
     )
     
+    declare_settings_type = DeclareLaunchArgument(
+        'settings_type',
+        default_value='EuRoC',
+        description='Type of settings file to use (e.g., EuRoC, TUM-VI)'
+    )
+    
+    declare_config_file = DeclareLaunchArgument(
+        'config_file',
+        default_value='neuralrecon.yaml',
+        description='Name of the NeuralRecon configuration file'
+    )
+    
+    # Performance tuning arguments
+    declare_gpu_memory_fraction = DeclareLaunchArgument(
+        'gpu_memory_fraction',
+        default_value='0.8',
+        description='Fraction of GPU memory to use (0.0-1.0)'
+    )
+    
+    declare_processing_rate = DeclareLaunchArgument(
+        'processing_rate',
+        default_value='5.0',
+        description='Rate at which to process batches (Hz)'
+    )
+    
+    declare_use_thread = DeclareLaunchArgument(
+        'use_thread',
+        default_value='true',
+        description='Use separate thread for neural processing'
+    )
+    
+    declare_max_batch_size = DeclareLaunchArgument(
+        'max_batch_size',
+        default_value='10',
+        description='Maximum number of frames to process in a batch'
+    )
+    
+    declare_reset_on_failure = DeclareLaunchArgument(
+        'reset_on_failure',
+        default_value='false',
+        description='Reset SLAM system after consecutive tracking failures'
+    )
+    
+    # Set settings file path based on IMU usage
+    settings_file_path = os.path.join(
+        orb_slam_dir, 
+        'orb_slam3', 
+        'config',
+        'Monocular-Inertial' if LaunchConfiguration('use_imu').perform(None) == 'true' else 'Monocular',
+        f"{LaunchConfiguration('settings_type').perform(None)}.yaml"
+    )
+    
+    # Path to neural reconstruction config
+    neural_config_path = os.path.join(package_dir, 'config', LaunchConfiguration('config_file').perform(None))
+    
     # ORB-SLAM3 node
     orbslam_node = Node(
         package='neural_slam_ros',
@@ -69,6 +150,13 @@ def generate_launch_description():
             'voc_file_path': voc_file_path,
             'settings_file_path': settings_file_path,
             'enable_pangolin': enable_pangolin,
+            'image_topic': image_topic,
+            'imu_topic': imu_topic,
+            'use_imu': use_imu,
+            'visualize_trajectory': visualize_trajectory,
+            'reset_on_failure': reset_on_failure,
+            'tf_broadcast_rate': 20.0,
+            'frame_skipping_enabled': True,
         }],
         output='screen'
     )
@@ -84,22 +172,59 @@ def generate_launch_description():
             'save_interval': save_interval,
             'show_visualization': enable_visualization,
             'output_dir': output_dir,
+            'image_topic': image_topic,
+            'gpu_memory_fraction': gpu_memory_fraction,
+            'processing_rate': processing_rate,
+            'use_thread': use_thread,
+            'max_batch_size': max_batch_size,
+            'tf_timeout': 0.1,
+            'visualize_mesh': True,
+            'publish_status': True,
         }],
         output='screen'
     )
     
+    # RViz for visualization
+    rviz_config = os.path.join(package_dir, 'config', 'neural_slam.rviz')
+    if os.path.exists(rviz_config):
+        rviz_node = Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz_config],
+            output='screen'
+        )
+    else:
+        rviz_node = None
+    
     # Create the launch description and add actions
     ld = LaunchDescription()
     
-    # Add launch arguments
+    # Add basic launch arguments
+    ld.add_action(declare_use_imu)
     ld.add_action(declare_image_topic)
+    ld.add_action(declare_imu_topic)
     ld.add_action(declare_enable_pangolin)
     ld.add_action(declare_enable_visualization)
+    ld.add_action(declare_visualize_trajectory)
     ld.add_action(declare_save_interval)
     ld.add_action(declare_output_dir)
+    ld.add_action(declare_settings_type)
+    ld.add_action(declare_config_file)
+    
+    # Add performance tuning arguments
+    ld.add_action(declare_gpu_memory_fraction)
+    ld.add_action(declare_processing_rate)
+    ld.add_action(declare_use_thread)
+    ld.add_action(declare_max_batch_size)
+    ld.add_action(declare_reset_on_failure)
     
     # Add nodes
     ld.add_action(orbslam_node)
     ld.add_action(neuralrecon_node)
+    
+    # Add RViz if config exists
+    if rviz_node:
+        ld.add_action(rviz_node)
     
     return ld
