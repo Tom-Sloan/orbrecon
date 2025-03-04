@@ -482,7 +482,8 @@ private:
         
         try {
             num_keyframes = slam_system_->GetTrackingState();
-            num_map_points = slam_system_->GetTrackedMapPoints();
+            auto mapPoints = slam_system_->GetTrackedMapPoints();
+            num_map_points = static_cast<int>(mapPoints.size());
             
             // Update keyframe count
             if (num_keyframes > 0) {
