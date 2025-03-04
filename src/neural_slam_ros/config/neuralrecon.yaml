@@ -1,0 +1,25 @@
+DATASET: 'demo'
+BATCH_SIZE: 1
+N_VIEWS: 9
+N_WORKERS: 4
+
+# TSDF
+VOXEL_SIZE: 0.04
+TRUNC: 0.12
+
+# Model
+BACKBONE: 'fpn-mnas-1'
+FUSION: 'gru'
+FUSION_PARAMS:
+  hidden: 64
+N_LAYER: 3
+
+LOGDIR: './checkpoints/neucon-release.ckpt'
+
+# Demo
+TEST:
+  PATH: './demo_data'
+  SAVE_SCENE_MESH: True
+  SAVE_INCREMENTAL: False
+  VIS_INCREMENTAL: True
+  VIS_RESULT: True
