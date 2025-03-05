@@ -15,7 +15,7 @@ MonocularInertialNode::MonocularInertialNode() : Node("mono_inertial_node")
     this->declare_parameter("visualize_trajectory", true);
     this->declare_parameter("tf_broadcast_rate", 20.0);
     this->declare_parameter("use_imu", true);
-    this->declare_parameter("imu_topic", "/mono_py_driver/imu_msg");
+    this->declare_parameter("imu_topic", "/imu/data");
     
     // Populate default values
     nodeName = "not_set";
@@ -115,7 +115,8 @@ MonocularInertialNode::~MonocularInertialNode()
 void MonocularInertialNode::experimentSetting_callback(const std_msgs::msg::String& msg)
 {
     bSettingsFromPython = true;
-    experimentConfig = msg.data.c_str();
+    // Use string assignment instead of c_str() to avoid dangling pointer
+    experimentConfig = msg.data;
     
     RCLCPP_INFO(this->get_logger(), "Configuration YAML file name: %s", experimentConfig.c_str());
 

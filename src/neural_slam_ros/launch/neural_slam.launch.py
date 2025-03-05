@@ -218,6 +218,7 @@ def generate_launch_description():
             'image_topic': image_topic,
             'imu_topic': imu_topic,
             'use_imu': use_imu,
+            'imu_topic': '/imu/data',  # Ensure this matches the topic from mono_driver_node.py
             'visualize_trajectory': visualize_trajectory,
             'reset_on_failure': reset_on_failure,
             'tf_broadcast_rate': 20.0,
