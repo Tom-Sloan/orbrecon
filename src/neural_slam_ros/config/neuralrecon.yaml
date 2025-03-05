@@ -4,9 +4,10 @@ SAVE_SCENE_MESH: True
 SAVE_INCREMENTAL: False
 VIS_INCREMENTAL: False
 REDUCE_GPU_MEM: True  # Drastically reduces GPU memory and will slow down inference a bit.
-LOGDIR: './checkpoints'
+LOGDIR: '/home/sam3/Desktop/Toms_Workspace/active_mapping/src/neural_slam_ros/checkpoints/model_000047.ckpt'
 SAVE_FREQ: 1
 MODE: 'test'
+PROJ_MATRIX: True
 
 TEST:
   # Change your own data path here

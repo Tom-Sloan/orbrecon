@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+# Standard library imports
 import os
 import sys
 import time
@@ -7,9 +8,17 @@ import pickle
 import threading
 import queue
 import traceback
+
+# Third-party imports
 import numpy as np
 import cv2
 import torch
+import torch.nn
+import torch.cuda
+import yaml
+from scipy.spatial.transform import Rotation
+
+# ROS imports
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
@@ -21,8 +30,6 @@ from std_msgs.msg import Float64, String
 from std_srvs.srv import Trigger
 from visualization_msgs.msg import Marker
 import tf2_ros
-import yaml
-from scipy.spatial.transform import Rotation
 
 # Resolve environment variables in paths
 def resolve_path(path):
@@ -46,6 +53,7 @@ neuralrecon_path = resolve_path('/home/sam3/Desktop/Toms_Workspace/active_mappin
 if neuralrecon_path not in sys.path:
     sys.path.append(neuralrecon_path)
 
+# NeuralRecon imports
 try:
     from models.neuralrecon import NeuralRecon
     from utils import SaveScene
@@ -181,7 +189,6 @@ class NeuralReconNode(Node):
         # Limit GPU memory usage if specified
         if gpu_memory_fraction < 1.0:
             try:
-                import torch.cuda
                 if torch.cuda.is_available():
                     device = torch.cuda.current_device()
                     total_memory = torch.cuda.get_device_properties(device).total_memory
@@ -200,21 +207,45 @@ class NeuralReconNode(Node):
         
         # Initialize model
         self.get_logger().info("Initializing NeuralRecon model...")
-        # try:
-        self.model = NeuralRecon(cfg).cuda().eval()
-        # except Exception as e:
-        #     self.get_logger().error(f"Failed to initialize NeuralRecon model: {e}")
-        #     self.get_logger().error(traceback.format_exc())
-        #     raise
+        try:
+            self.model = NeuralRecon(cfg).cuda()
+            if torch.cuda.device_count() > 1:
+                self.get_logger().info(f"Using {torch.cuda.device_count()} GPUs")
+                self.model = torch.nn.DataParallel(self.model)
+            self.model.eval()
+        except Exception as e:
+            self.get_logger().error(f"Failed to initialize NeuralRecon model: {e}")
+            self.get_logger().error(traceback.format_exc())
+            raise
         
         # Load checkpoint
         if os.path.exists(cfg.LOGDIR):
             self.get_logger().info(f"Loading checkpoint from {cfg.LOGDIR}")
             try:
                 checkpoint = torch.load(cfg.LOGDIR)
-                self.model.load_state_dict(checkpoint['model'])
+                # Remove 'module.' prefix if it exists and model is not DataParallel
+                state_dict = checkpoint['model']
+                if not isinstance(self.model, torch.nn.DataParallel):
+                    new_state_dict = {}
+                    for k, v in state_dict.items():
+                        if k.startswith('module.'):
+                            new_state_dict[k[7:]] = v  # Remove 'module.' prefix
+                        else:
+                            new_state_dict[k] = v
+                    state_dict = new_state_dict
+                
+                # Load the state dict
+                try:
+                    self.model.load_state_dict(state_dict)
+                    self.get_logger().info("Checkpoint loaded successfully")
+                except RuntimeError as e:
+                    self.get_logger().warn(f"Strict loading failed, trying non-strict loading: {e}")
+                    # Try loading with strict=False to handle partial matches
+                    self.model.load_state_dict(state_dict, strict=False)
+                    self.get_logger().info("Checkpoint loaded with non-strict matching")
             except Exception as e:
                 self.get_logger().error(f"Failed to load checkpoint: {e}")
+                self.get_logger().error(traceback.format_exc())
                 raise
         else:
             self.get_logger().warn(f"Checkpoint not found: {cfg.LOGDIR}")
@@ -676,7 +707,6 @@ class NeuralReconNode(Node):
                     del self.tsdf_volume
             
             # Empty CUDA cache
-            import torch
             torch.cuda.empty_cache()
             self.get_logger().info("GPU memory cleaned up")
         except Exception as e:
@@ -698,34 +728,28 @@ def main(args=None):
     # Initialize ROS
     rclpy.init(args=args)
     
+    # Create node
+    node = NeuralReconNode()
+    
+    # Create executor for better concurrency
+    executor = MultiThreadedExecutor(num_threads=3)
+    executor.add_node(node)
+    
     try:
-        # Create node
-        node = NeuralReconNode()
-        
-        # Create executor for better concurrency
-        executor = MultiThreadedExecutor(num_threads=3)
-        executor.add_node(node)
-        
-        try:
-            # Spin with the executor
-            executor.spin()
-        except KeyboardInterrupt:
-            pass
-        except Exception as e:
-            node.get_logger().error(f"Unhandled exception: {e}")
-            node.get_logger().error(traceback.format_exc())
-        finally:
-            # Make sure to save final reconstruction
-            node.save_reconstruction()
-            # Cleanup
-            executor.shutdown()
-            node.destroy_node()
+        # Spin with the executor
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
     except Exception as e:
-        print(f"Failed to initialize NeuralRecon node: {e}")
-        traceback.print_exc()
+        node.get_logger().error(f"Unhandled exception: {e}")
+        node.get_logger().error(traceback.format_exc())
     finally:
-        # Shutdown ROS
-        rclpy.shutdown()
+        # Make sure to save final reconstruction
+        node.save_reconstruction()
+        # Cleanup
+        executor.shutdown()
+        node.destroy_node()
+
 
 if __name__ == '__main__':
     main()
