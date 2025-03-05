@@ -87,6 +87,7 @@ ament_target_dependencies(neural_recon_node
 # Install Python scripts
 install(PROGRAMS
   scripts/neural_recon_node.py
+  scripts/run_neural_recon.sh
   DESTINATION lib/${PROJECT_NAME}
 )
 

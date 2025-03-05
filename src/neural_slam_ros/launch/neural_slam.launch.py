@@ -208,7 +208,7 @@ def generate_launch_description():
     # NeuralRecon node
     neuralrecon_node = Node(
         package='neural_slam_ros',
-        executable='neural_recon_node.py',
+        executable='run_neural_recon.sh',
         name='neural_recon',
         parameters=[{
             'config_file': neural_config_path,
@@ -217,6 +217,7 @@ def generate_launch_description():
             'show_visualization': enable_visualization,
             'output_dir': output_dir,
             'image_topic': image_topic,
+            'trajectory_topic': '/orb_slam3/trajectory',
             'gpu_memory_fraction': gpu_memory_fraction,
             'processing_rate': processing_rate,
             'use_thread': use_thread,
@@ -230,16 +231,14 @@ def generate_launch_description():
     
     # RViz for visualization
     rviz_config = os.path.join(package_dir, 'config', 'neural_slam.rviz')
-    if os.path.exists(rviz_config):
-        rviz_node = Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', rviz_config],
-            output='screen'
-        )
-    else:
-        rviz_node = None
+    # Always create RViz node, even if config doesn't exist yet
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', rviz_config] if os.path.exists(rviz_config) else [],
+        output='screen'
+    )
     
     # Create the launch description and add actions
     ld = LaunchDescription()

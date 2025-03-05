@@ -24,11 +24,11 @@ from rclpy.node import Node
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import PoseStamped, TransformStamped
+from geometry_msgs.msg import PoseStamped, TransformStamped, PoseArray, Point
 from cv_bridge import CvBridge
 from std_msgs.msg import Float64, String
 from std_srvs.srv import Trigger
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 import tf2_ros
 
 # Resolve environment variables in paths
@@ -124,6 +124,7 @@ class NeuralReconNode(Node):
         self.declare_parameter('max_batch_size', 10)  # Maximum number of frames in a batch
         self.declare_parameter('gpu_memory_fraction', 0.8)  # GPU memory fraction to use
         self.declare_parameter('image_topic', '/camera/image_raw')
+        self.declare_parameter('trajectory_topic', '/orb_slam3/trajectory')  # ORB-SLAM3 trajectory topic
         self.declare_parameter('tf_timeout', 0.1)  # TF lookup timeout in seconds
         self.declare_parameter('use_thread', True)  # Whether to use a separate processing thread
         self.declare_parameter('visualize_mesh', True)  # Whether to visualize mesh in RViz
@@ -139,6 +140,7 @@ class NeuralReconNode(Node):
         self.max_batch_size = self.get_parameter('max_batch_size').value
         gpu_memory_fraction = self.get_parameter('gpu_memory_fraction').value
         image_topic = self.get_parameter('image_topic').value
+        trajectory_topic = self.get_parameter('trajectory_topic').value
         self.tf_timeout = self.get_parameter('tf_timeout').value
         self.use_thread = self.get_parameter('use_thread').value
         self.visualize_mesh = self.get_parameter('visualize_mesh').value
@@ -271,6 +273,7 @@ class NeuralReconNode(Node):
         self.image_buffer = []
         self.pose_buffer = []
         self.timestamps = []
+        self.has_received_trajectory = False
         
         # Initialize TF buffer and listener
         self.tf_buffer = tf2_ros.Buffer(cache_time=rclpy.duration.Duration(seconds=10.0))
@@ -279,6 +282,7 @@ class NeuralReconNode(Node):
         # Create publisher for visualization
         if self.visualize_mesh:
             self.mesh_pub = self.create_publisher(Marker, 'neural_recon/mesh', 10)
+            self.mesh_array_pub = self.create_publisher(MarkerArray, 'neural_recon/mesh_array', 10)
         
         # Status publisher
         if self.publish_status:
@@ -304,6 +308,11 @@ class NeuralReconNode(Node):
         self.timestamp_sub = self.create_subscription(
             Float64, '/mono_py_driver/timestep_msg', self.timestamp_callback, 10,
             callback_group=self.subscriber_callback_group)
+            
+        # Subscribe to ORB-SLAM3 trajectory topic
+        self.trajectory_sub = self.create_subscription(
+            PoseArray, trajectory_topic, self.trajectory_callback, 10,
+            callback_group=self.subscriber_callback_group)
         
         # Start processing thread if enabled
         if self.use_thread:
@@ -320,7 +329,7 @@ class NeuralReconNode(Node):
         # Publish mesh timer (slower rate)
         if self.visualize_mesh:
             self.mesh_timer = self.create_timer(
-                2.0, self.publish_mesh,
+                1.0, self.publish_mesh,
                 callback_group=self.timer_callback_group)
         
         self.get_logger().info("NeuralRecon node initialized")
@@ -393,18 +402,97 @@ class NeuralReconNode(Node):
         """Callback for timestamp message"""
         with self.buffer_lock:
             self.timestamps.append(msg.data)
+            
+    def trajectory_callback(self, msg):
+        """Callback for ORB-SLAM3 trajectory message (PoseArray)"""
+        try:
+            self.get_logger().info(f"Received trajectory with {len(msg.poses)} poses")
+            
+            # Skip empty trajectories
+            if not msg.poses:
+                return
+                
+            # Mark that we've received a trajectory
+            self.has_received_trajectory = True
+                
+            # Convert poses to matrices and store in buffer
+            trajectory_poses = []
+            for pose in msg.poses:
+                # Extract position
+                x = pose.position.x
+                y = pose.position.y
+                z = pose.position.z
+                
+                # Extract orientation as quaternion
+                qx = pose.orientation.x
+                qy = pose.orientation.y
+                qz = pose.orientation.z
+                qw = pose.orientation.w
+                
+                # Convert quaternion to rotation matrix
+                r = Rotation.from_quat([qx, qy, qz, qw])
+                rot_matrix = r.as_matrix()
+                
+                # Create 4x4 matrix
+                matrix = np.eye(4)
+                matrix[:3, :3] = rot_matrix
+                matrix[:3, 3] = [x, y, z]
+                
+                trajectory_poses.append(matrix)
+                
+            # Store trajectory poses in buffer (thread-safe)
+            with self.buffer_lock:
+                # If we're receiving a trajectory, we can create a batch directly
+                # from these poses and any cached images
+                if len(self.image_buffer) >= len(trajectory_poses):
+                    # Take matching number of images from buffer
+                    image_batch = self.image_buffer[:len(trajectory_poses)]
+                    # Remove used images from buffer
+                    self.image_buffer = self.image_buffer[len(trajectory_poses):]
+                    
+                    # Set timestamp batch if available
+                    timestamp_batch = self.timestamps[:len(trajectory_poses)] if len(self.timestamps) >= len(trajectory_poses) else []
+                    # Remove used timestamps
+                    self.timestamps = self.timestamps[len(trajectory_poses):] if len(self.timestamps) >= len(trajectory_poses) else self.timestamps
+                    
+                    # Process the batch
+                    if self.use_thread:
+                        # Send to processing thread
+                        self.processing_thread.enqueue_batch(image_batch, trajectory_poses, timestamp_batch)
+                    else:
+                        # Process directly
+                        self.process_batch_internal((image_batch, trajectory_poses, timestamp_batch))
+                else:
+                    # Store trajectory poses for later use when images arrive
+                    self.pose_buffer.extend(trajectory_poses)
+                    self.get_logger().debug(f"Stored {len(trajectory_poses)} poses in buffer, total: {len(self.pose_buffer)}")
+        except Exception as e:
+            self.get_logger().error(f"Error in trajectory callback: {e}")
+            self.get_logger().error(traceback.format_exc())
     
     def image_callback(self, msg):
         """Callback for camera images"""
         try:
             # Convert ROS image to OpenCV
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
+            try:
+                # Get image encoding from message
+                encoding = msg.encoding if hasattr(msg, 'encoding') and msg.encoding else "rgb8"
+                cv_image = self.bridge.imgmsg_to_cv2(msg, encoding)
+            except ImportError as e:
+                # Fallback to direct conversion if cv_bridge fails
+                self.get_logger().warn(f"cv_bridge import error: {e}. Using fallback conversion.")
+                import numpy as np
+                # Create numpy array from bytes
+                img_data = np.frombuffer(msg.data, dtype=np.uint8)
+                # Reshape based on height, width, and channels
+                channels = 3  # Assume RGB
+                cv_image = img_data.reshape(msg.height, msg.width, channels)
             
             # Try to get the camera pose from tf
             try:
                 # Look up transform from world to camera
                 transform = self.tf_buffer.lookup_transform(
-                    'world', 'camera', rclpy.time.Time(seconds_nanoseconds=msg.header.stamp.sec_nanosec),
+                    'world', 'camera', msg.header.stamp,
                     timeout=rclpy.duration.Duration(seconds=self.tf_timeout))
                 
                 # Convert to world_to_camera matrix
@@ -468,11 +556,17 @@ class NeuralReconNode(Node):
     def trigger_batch_processing(self):
         """Check if there are batches to process and trigger processing"""
         with self.buffer_lock:
+            # Skip processing if we haven't received trajectory data yet
+            if not self.has_received_trajectory:
+                if len(self.image_buffer) > 0:
+                    self.get_logger().debug(f"Waiting for trajectory data before processing ({len(self.image_buffer)} images buffered)")
+                return
+                
             if len(self.image_buffer) == 0 or len(self.pose_buffer) == 0:
                 return
             
-            # Cap batch size to max_batch_size
-            batch_size = min(len(self.image_buffer), self.max_batch_size)
+            # Cap batch size to max_batch_size and available poses
+            batch_size = min(len(self.image_buffer), len(self.pose_buffer), self.max_batch_size)
             
             # Copy data for processing
             image_batch = self.image_buffer[:batch_size]
@@ -506,25 +600,64 @@ class NeuralReconNode(Node):
         
         try:
             with torch.no_grad():
+                # Debug outputs for diagnosis
+                self.get_logger().info(f"Image batch shape: {len(image_batch)} images")
+                self.get_logger().info(f"Pose batch shape: {len(pose_batch)} poses")
+                if len(pose_batch) > 0:
+                    self.get_logger().info(f"Sample pose: \n{pose_batch[0]}")
+                
                 # Prepare batch data
                 batch = self.prepare_batch(image_batch, pose_batch)
                 
                 # Run inference
-                outputs = self.model(batch)
+                try:
+                    self.get_logger().info("Running NeuralRecon inference...")
+                    outputs = self.model(batch)
+                    self.get_logger().info(f"Inference complete, outputs keys: {list(outputs.keys())}")
+                except Exception as e:
+                    self.get_logger().error(f"Error during model inference: {e}")
+                    self.get_logger().error(traceback.format_exc())
+                    raise
                 
                 # Update TSDF volume with new results (thread-safe)
                 with self.tsdf_lock:
-                    if self.tsdf_volume is None:
-                        self.tsdf_volume = outputs
-                    else:
-                        # Integrate new observations
-                        self.tsdf_volume['tsdf_vol'] += outputs['tsdf_vol']
-                        self.tsdf_volume['weight_vol'] += outputs['weight_vol']
+                    try:
+                        if self.tsdf_volume is None:
+                            self.get_logger().info("Initializing TSDF volume")
+                            self.tsdf_volume = outputs
+                        else:
+                            # Debug output
+                            self.get_logger().info(f"Integrating new observations into TSDF volume")
+                            self.get_logger().info(f"TSDF keys before integration: {list(self.tsdf_volume.keys())}")
+                            
+                            # Integrate new observations - check for required keys first
+                            if 'tsdf_vol' in outputs and 'weight_vol' in outputs:
+                                self.tsdf_volume['tsdf_vol'] += outputs['tsdf_vol']
+                                self.tsdf_volume['weight_vol'] += outputs['weight_vol']
+                                
+                                # If scene_tsdf was computed, update it
+                                if 'scene_tsdf' in outputs:
+                                    self.tsdf_volume['scene_tsdf'] = outputs['scene_tsdf']
+                            else:
+                                self.get_logger().error(f"Required fields missing in NeuralRecon output: {list(outputs.keys())}")
+                    except Exception as e:
+                        self.get_logger().error(f"Error updating TSDF volume: {e}")
+                        self.get_logger().error(traceback.format_exc())
+                        raise
                 
                 # Visualize if enabled
                 if self.show_visualization:
-                    with self.tsdf_lock:
-                        self.saver.vis_incremental(self.tsdf_volume)
+                    try:
+                        with self.tsdf_lock:
+                            self.get_logger().info("Visualizing incremental reconstruction")
+                            self.saver.vis_incremental(self.tsdf_volume)
+                            
+                            # Also save mesh at certain intervals
+                            if self.processed_count % 50 == 0:
+                                self.save_reconstruction()
+                    except Exception as e:
+                        self.get_logger().error(f"Error in visualization: {e}")
+                        self.get_logger().error(traceback.format_exc())
             
             # Update processing stats
             with self.status_lock:
@@ -535,6 +668,8 @@ class NeuralReconNode(Node):
                 # Keep only the last 10 processing times
                 if len(self.processing_times) > 10:
                     self.processing_times.pop(0)
+                    
+                self.get_logger().info(f"Batch processing completed in {process_time:.2f}s. Total processed: {self.processed_count}")
             
         except Exception as e:
             self.get_logger().error(f"Error in batch processing: {e}")
@@ -587,7 +722,22 @@ class NeuralReconNode(Node):
             
             self.get_logger().info(f"Saving reconstruction at frame {self.frame_count}")
             try:
-                self.saver.save_scene_eval(self.tsdf_volume, "online_reconstruction")
+                # Create output directories
+                mesh_dir = os.path.join(self.output_dir, "meshes")
+                os.makedirs(mesh_dir, exist_ok=True)
+                
+                # Create mesh filename
+                mesh_file = os.path.join(mesh_dir, f"reconstruction_{self.frame_count}.ply")
+                
+                # Save the reconstruction mesh
+                self.get_logger().info(f"Saving mesh to {mesh_file}")
+                self.saver.save_scene_eval(self.tsdf_volume, mesh_file)
+                
+                # Also save a copy to the ROS package meshes directory
+                package_mesh_file = os.path.join("/home/sam3/Desktop/Toms_Workspace/active_mapping/src/neural_slam_ros/meshes", "reconstruction.ply")
+                os.system(f"cp {mesh_file} {package_mesh_file}")
+                
+                self.get_logger().info(f"Mesh saved successfully to {mesh_file} and {package_mesh_file}")
                 return True
             except Exception as e:
                 self.get_logger().error(f"Error saving reconstruction: {e}")
@@ -648,6 +798,8 @@ class NeuralReconNode(Node):
                 f"Frames: {self.frame_count}, "
                 f"Processed: {self.processed_count}, "
                 f"Queue: {len(self.image_buffer)}, "
+                f"Poses: {len(self.pose_buffer)}, "
+                f"Has trajectory: {self.has_received_trajectory}, "
                 f"Processing: {avg_time:.3f}s ({fps:.1f} FPS), "
                 f"TF failures: {self.tf_lookup_failures}"
             )
@@ -661,40 +813,124 @@ class NeuralReconNode(Node):
         
         with self.tsdf_lock:
             if self.tsdf_volume is None:
+                self.get_logger().debug("Cannot publish mesh: TSDF volume is None")
                 return
             
             try:
-                # Create a marker for the mesh
+                # Check if output directory exists
+                mesh_dir = os.path.join(self.output_dir, "meshes")
+                os.makedirs(mesh_dir, exist_ok=True)
+                
+                # Create a filename for the mesh
+                mesh_file = os.path.join(mesh_dir, "reconstruction.ply")
+                package_mesh_file = os.path.join("/home/sam3/Desktop/Toms_Workspace/active_mapping/src/neural_slam_ros/meshes", "reconstruction.ply")
+                
+                # Try to extract mesh from TSDF volume
+                # This uses the SaveScene utility from NeuralRecon
+                try:
+                    # Use the saver to save the mesh to a file
+                    if not os.path.exists(mesh_file) or self.processed_count % 30 == 0:  # Only save periodically
+                        self.get_logger().info(f"Saving mesh to {mesh_file}")
+                        self.saver.save_scene_eval(self.tsdf_volume, mesh_file)
+                        # Copy to package directory for RViz visualization
+                        os.system(f"cp {mesh_file} {package_mesh_file}")
+                        self.get_logger().info(f"Mesh saved successfully")
+                except Exception as e:
+                    self.get_logger().error(f"Error extracting mesh from TSDF: {e}")
+                    self.get_logger().error(traceback.format_exc())
+                
+                # Create markers for points in the TSDF volume (simpler visualization)
                 marker = Marker()
                 marker.header.frame_id = "world"
                 marker.header.stamp = self.get_clock().now().to_msg()
                 marker.id = 0
-                marker.type = Marker.MESH_RESOURCE
+                marker.type = Marker.POINTS
                 marker.action = Marker.ADD
                 
-                # Set mesh resource (this would ideally be a dynamic mesh, but for now use a placeholder)
-                # In practice, you'd need to convert the TSDF volume to a mesh and publish that
-                marker.mesh_resource = "package://neural_slam_ros/meshes/reconstruction.stl"
+                # Extract points from TSDF volume
+                if 'tsdf_vol' in self.tsdf_volume and 'vol_origin' in self.tsdf_volume:
+                    try:
+                        # Get volume dimensions
+                        tsdf = self.tsdf_volume['tsdf_vol']
+                        origin = self.tsdf_volume['vol_origin'][0].cpu().numpy()
+                        
+                        # Set point size and color
+                        marker.scale.x = 0.05
+                        marker.scale.y = 0.05
+                        marker.color.r = 0.0
+                        marker.color.g = 1.0
+                        marker.color.b = 0.0
+                        marker.color.a = 0.8
+                        
+                        # Add points where TSDF is close to surface
+                        tsdf_cpu = tsdf.cpu().numpy()
+                        voxel_size = 0.04  # From NeuralRecon config
+                        
+                        # Find surface points (where TSDF is close to 0)
+                        surface_indices = np.where(np.abs(tsdf_cpu) < 0.1)
+                        if len(surface_indices[0]) > 0:
+                            # Sample points to avoid too many markers
+                            sample_rate = max(1, len(surface_indices[0]) // 10000)
+                            for i in range(0, len(surface_indices[0]), sample_rate):
+                                x, y, z = surface_indices[0][i], surface_indices[1][i], surface_indices[2][i]
+                                
+                                # Convert voxel indices to world coordinates
+                                px = origin[0] + x * voxel_size
+                                py = origin[1] + y * voxel_size
+                                pz = origin[2] + z * voxel_size
+                                
+                                point = Point()
+                                point.x = float(px)
+                                point.y = float(py)
+                                point.z = float(pz)
+                                marker.points.append(point)
+                        
+                        # If reconstruction.ply exists, use mesh marker instead
+                        if os.path.exists(package_mesh_file):
+                            mesh_marker = Marker()
+                            mesh_marker.header.frame_id = "world"
+                            mesh_marker.header.stamp = self.get_clock().now().to_msg()
+                            mesh_marker.id = 1
+                            mesh_marker.type = Marker.MESH_RESOURCE
+                            mesh_marker.action = Marker.ADD
+                            
+                            # Set mesh resource path
+                            mesh_marker.mesh_resource = "package://neural_slam_ros/meshes/reconstruction.ply"
+                            
+                            # Set pose and scale
+                            mesh_marker.pose.position.x = 0.0
+                            mesh_marker.pose.position.y = 0.0
+                            mesh_marker.pose.position.z = 0.0
+                            mesh_marker.pose.orientation.w = 1.0
+                            
+                            mesh_marker.scale.x = 1.0
+                            mesh_marker.scale.y = 1.0
+                            mesh_marker.scale.z = 1.0
+                            
+                            # Set color
+                            mesh_marker.color.r = 0.0
+                            mesh_marker.color.g = 0.8
+                            mesh_marker.color.b = 0.2
+                            mesh_marker.color.a = 0.8
+                            
+                            # Publish the mesh marker
+                            self.mesh_pub.publish(mesh_marker)
+                            self.get_logger().info(f"Published mesh marker from {package_mesh_file}")
+                    except Exception as e:
+                        self.get_logger().error(f"Error creating point markers: {e}")
+                        self.get_logger().error(traceback.format_exc())
+                else:
+                    self.get_logger().warn("TSDF volume doesn't contain expected fields")
                 
-                # Set pose (identity)
-                marker.pose.position.x = 0.0
-                marker.pose.position.y = 0.0
-                marker.pose.position.z = 0.0
-                marker.pose.orientation.w = 1.0
-                
-                # Set scale and color
-                marker.scale.x = 1.0
-                marker.scale.y = 1.0
-                marker.scale.z = 1.0
-                marker.color.r = 0.0
-                marker.color.g = 0.8
-                marker.color.b = 0.2
-                marker.color.a = 0.8
-                
-                # Publish the marker
-                self.mesh_pub.publish(marker)
+                # Publish the point marker
+                if len(marker.points) > 0:
+                    self.mesh_pub.publish(marker)
+                    self.get_logger().info(f"Published {len(marker.points)} point markers")
+                else:
+                    self.get_logger().warn("No points to publish")
             except Exception as e:
                 self.get_logger().error(f"Error publishing mesh: {e}")
+                self.get_logger().error(traceback.format_exc())
     
     def cleanup_gpu_memory(self):
         """Clean up GPU memory"""

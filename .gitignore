@@ -5,3 +5,4 @@
 /install_isolated/
 /devel_isolated/
 /devel/
+src/neural_slam_ros/checkpoints/*

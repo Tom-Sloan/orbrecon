@@ -1,0 +1,87 @@
+ # Build the package
+colcon build --symlink-install
+
+# Source the setup script
+source install/setup.bash
+ 
+ Stop all running nodes and restart them:
+  # Kill all existing nodes
+  killall ros2
+  # Source the setup file
+  source /home/sam3/Desktop/Toms_Workspace/active_mapping/install/setup.bash
+  # Start the ORB-SLAM3 node with our new TF broadcasting enabled
+  ros2 run ros2_orb_slam3 mono_node_cpp --ros-args -p node_name_arg:=mono_slam_cpp
+  # In another terminal, start the driver
+  ros2 run ros2_orb_slam3 mono_driver_node.py --ros-args -p settings_name:=EuRoC -p image_seq:=sample
+  # In another terminal, launch the NeuralRecon node with correct image topic
+  ros2 launch neural_slam_ros neural_slam.launch.py image_topic:=/mono_py_driver/img_msg
+
+  3. Monitor for transforms being published:
+  ros2 topic echo /tf
+
+  4. Check if the neural reconstruction is working:
+  ros2 topic echo /neural_recon/status
+
+  5. Check if the ORB-SLAM3 is working:
+  ros2 topic echo /orb_slam3/trajectory
+
+
+(neucon) sam3@sam3-dl-1:~/Desktop/Toms_Workspace/active_mapping$ ros2 launch neural_slam_ros neural_slam.launch.py image_topic:=/mono_py_driver/img_msg
+[INFO] [launch]: All log files can be found below /home/sam3/.ros/log/2025-03-05-12-43-23-394129-sam3-dl-1-753120
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [neural_recon_node-1]: process started with pid [753121]
+[INFO] [run_neural_recon.sh-2]: process started with pid [753123]
+[INFO] [rviz2-3]: process started with pid [753125]
+[neural_recon_node-1] /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node: /home/sam3/anaconda3/lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /opt/ros/humble/lib/librclcpp.so)
+[neural_recon_node-1] /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node: /home/sam3/anaconda3/lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /usr/local/lib/libpango_core.so)
+[neural_recon_node-1] /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node: /home/sam3/anaconda3/lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /lib/libgdal.so.30)
+[ERROR] [neural_recon_node-1]: process has died [pid 753121, exit code 1, cmd '/home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node --ros-args -r __node:=neural_recon_bridge --params-file /tmp/launch_params_3_li57nn'].
+[rviz2-3] [INFO] [1741196603.612487553] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-3] [INFO] [1741196603.612601660] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-3] [INFO] [1741196603.644896181] [rviz2]: Stereo is NOT SUPPORTED
+[run_neural_recon.sh-2] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/conv.py:19: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+[run_neural_recon.sh-2]   @custom_fwd(cast_inputs=torch.half)
+[run_neural_recon.sh-2] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/conv.py:68: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+[run_neural_recon.sh-2]   def backward(ctx, grad_output: torch.Tensor):
+[run_neural_recon.sh-2] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/devoxelize.py:54: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+[run_neural_recon.sh-2]   @custom_fwd(cast_inputs=torch.half)
+[run_neural_recon.sh-2] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/devoxelize.py:77: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+[run_neural_recon.sh-2]   def backward(ctx, grad_output: torch.Tensor):
+[run_neural_recon.sh-2] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/voxelize.py:13: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+[run_neural_recon.sh-2]   @custom_fwd(cast_inputs=torch.half)
+[run_neural_recon.sh-2] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/voxelize.py:35: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+[run_neural_recon.sh-2]   def backward(ctx, grad_output: torch.Tensor):
+[run_neural_recon.sh-2] [INFO] [1741196605.527042077] [neural_recon]: Loading NeuralRecon config from /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/share/neural_slam_ros/config/neuralrecon.yaml
+[run_neural_recon.sh-2] [INFO] [1741196605.532279653] [neural_recon]: Loaded camera intrinsics: fx=458.654, fy=457.296, cx=367.215, cy=248.375
+[run_neural_recon.sh-2] [INFO] [1741196605.532516286] [neural_recon]: Initializing NeuralRecon model...
+[run_neural_recon.sh-2] /home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+[run_neural_recon.sh-2]   warnings.warn(
+[run_neural_recon.sh-2] /home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=MNASNet1_0_Weights.IMAGENET1K_V1`. You can also use `weights=MNASNet1_0_Weights.DEFAULT` to get the most up-to-date weights.
+[run_neural_recon.sh-2]   warnings.warn(msg)
+[run_neural_recon.sh-2] /home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/torch/cuda/__init__.py:716: UserWarning: Can't initialize NVML
+[run_neural_recon.sh-2]   warnings.warn("Can't initialize NVML")
+[run_neural_recon.sh-2] [INFO] [1741196605.798031960] [neural_recon]: Loading checkpoint from /home/sam3/Desktop/Toms_Workspace/active_mapping/src/neural_slam_ros/checkpoints/model_000047.ckpt
+[run_neural_recon.sh-2] /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node.py:227: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+[run_neural_recon.sh-2]   checkpoint = torch.load(cfg.LOGDIR)
+[run_neural_recon.sh-2] [INFO] [1741196605.929092929] [neural_recon]: Checkpoint loaded successfully
+[run_neural_recon.sh-2] [INFO] [1741196605.938224260] [neural_recon]: Started neural processing thread
+[run_neural_recon.sh-2] [INFO] [1741196605.938459913] [neural_recon]: NeuralRecon node initialized
+[run_neural_recon.sh-2] [WARN] [1741196626.191675014] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.294357266] [neural_recon]: Failed to get camera pose: "world" passed to lookupTransform argument target_frame does not exist. 
+[run_neural_recon.sh-2] [WARN] [1741196626.320462744] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.388105759] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.418955851] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.447822472] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.475443083] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.508839114] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.539363646] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.581212660] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.639529002] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.678253874] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.730886625] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.788887840] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.831175197] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.880666571] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+[run_neural_recon.sh-2] [WARN] [1741196626.929041145] [neural_recon]: cv_bridge import error: /lib/libgdal.so.30: undefined symbol: TIFFGetStrileByteCount, version LIBTIFF_4.0. Using fallback conversion.
+
+
