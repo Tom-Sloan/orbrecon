@@ -340,6 +340,22 @@ class NeuralReconNode(Node):
             self.get_logger().error(f"Camera config file not found: {camera_config}")
             raise FileNotFoundError(f"Camera config file not found: {camera_config}")
         
+        # Define a custom constructor for OpenCV matrices
+        def opencv_matrix_constructor(loader, node):
+            mapping = loader.construct_mapping(node, deep=True)
+            mat = OpenCVMatrix(**mapping)
+            # Convert to numpy array if data is available
+            if mat.data:
+                return np.array(mat.data, dtype=np.float32).reshape(mat.rows, mat.cols)
+            return mat
+        
+        # Create a custom loader
+        class OpenCVLoader(yaml.SafeLoader):
+            pass
+        
+        # Register the constructor
+        OpenCVLoader.add_constructor('tag:yaml.org,2002:opencv-matrix', opencv_matrix_constructor)
+        
         # Parse YAML file to extract camera intrinsics
         try:
             with open(camera_config, 'r') as f:
@@ -351,43 +367,21 @@ class NeuralReconNode(Node):
                     if first_newline != -1:
                         content = content[first_newline+1:]
                 
-                # Use regex to extract values directly from the file content
-                # to avoid YAML parsing issues with opencv-matrix
-                import re
-                
-                # Try to find Camera1 values (monocular-inertial)
-                fx_match = re.search(r'Camera1\.fx:\s*([\d\.]+)', content)
-                fy_match = re.search(r'Camera1\.fy:\s*([\d\.]+)', content)
-                cx_match = re.search(r'Camera1\.cx:\s*([\d\.]+)', content)
-                cy_match = re.search(r'Camera1\.cy:\s*([\d\.]+)', content)
-                
-                # If found, use those values
-                if fx_match and fy_match and cx_match and cy_match:
-                    fx = float(fx_match.group(1))
-                    fy = float(fy_match.group(1))
-                    cx = float(cx_match.group(1))
-                    cy = float(cy_match.group(1))
-                    self.get_logger().info(f"Found Camera1 intrinsics in config file with regex")
-                else:
-                    # Try Camera values (monocular)
-                    fx_match = re.search(r'Camera\.fx:\s*([\d\.]+)', content)
-                    fy_match = re.search(r'Camera\.fy:\s*([\d\.]+)', content)
-                    cx_match = re.search(r'Camera\.cx:\s*([\d\.]+)', content)
-                    cy_match = re.search(r'Camera\.cy:\s*([\d\.]+)', content)
-                    
-                    if fx_match and fy_match and cx_match and cy_match:
-                        fx = float(fx_match.group(1))
-                        fy = float(fy_match.group(1))
-                        cx = float(cx_match.group(1))
-                        cy = float(cy_match.group(1))
-                        self.get_logger().info(f"Found Camera intrinsics in config file with regex")
-                    else:
-                        # Fall back to default EuRoC values
-                        self.get_logger().warn("Could not find camera parameters in config, using EuRoC defaults")
-                        fx = 458.654
-                        fy = 457.296
-                        cx = 367.215
-                        cy = 248.375
+                # Use the custom loader
+                config = yaml.load(content, Loader=OpenCVLoader)
+            
+            # Check for Camera1 fields first (monocular-inertial format)
+            if 'Camera1.fx' in config:
+                fx = config.get('Camera1.fx', 0.0)
+                fy = config.get('Camera1.fy', 0.0)
+                cx = config.get('Camera1.cx', 0.0)
+                cy = config.get('Camera1.cy', 0.0)
+            # Fall back to Camera fields (monocular format)
+            else:
+                fx = config.get('Camera.fx', 0.0)
+                fy = config.get('Camera.fy', 0.0)
+                cx = config.get('Camera.cx', 0.0)
+                cy = config.get('Camera.cy', 0.0)
             
             # Check if we have valid intrinsics
             if fx <= 0 or fy <= 0:
@@ -404,8 +398,16 @@ class NeuralReconNode(Node):
             # Read IMU to camera transformation if available
             if 'IMU.T_b_c1' in config:
                 try:
-                    T_b_c1 = config.get('IMU.T_b_c1').tolist()
-                    self.T_imu_camera = np.array(T_b_c1, dtype=np.float32).reshape(4, 4)
+                    # If it was parsed as a numpy array, use it directly
+                    if isinstance(config.get('IMU.T_b_c1'), np.ndarray):
+                        self.T_imu_camera = config.get('IMU.T_b_c1')
+                    # Otherwise try to convert from OpenCVMatrix format
+                    else:
+                        T_b_c1 = config.get('IMU.T_b_c1')
+                        if hasattr(T_b_c1, 'data'):
+                            self.T_imu_camera = np.array(T_b_c1.data, dtype=np.float32).reshape(T_b_c1.rows, T_b_c1.cols)
+                        else:
+                            self.T_imu_camera = np.eye(4, dtype=np.float32)
                     self.get_logger().info(f"Loaded IMU to camera transform")
                 except Exception as e:
                     self.get_logger().warn(f"Failed to parse IMU to camera transform: {e}")
@@ -421,7 +423,8 @@ class NeuralReconNode(Node):
         except Exception as e:
             self.get_logger().error(f"Error loading camera intrinsics: {e}")
             raise
-    
+
+
     def timestamp_callback(self, msg):
         """Callback for timestamp message"""
         with self.buffer_lock:

@@ -29,11 +29,22 @@ def load_drone_config(path):
     """
     Load drone configuration from YAML file, handling OpenCV matrix format.
     """
-    # Create a custom loader that can handle !!opencv-matrix
+    # Define a custom constructor for OpenCV matrices
+    def opencv_matrix_constructor(loader, node):
+        mapping = loader.construct_mapping(node, deep=True)
+        mat = OpenCVMatrix(**mapping)
+        # Convert to numpy array if data is available
+        if mat.data:
+            import numpy as np
+            return np.array(mat.data, dtype=np.float32).reshape(mat.rows, mat.cols)
+        return mat
+    
+    # Create a custom loader
     class OpenCVLoader(yaml.SafeLoader):
         pass
     
-    # Register the constructor for !!opencv-matrix
+    # Register the constructor for both the OpenCV tag formats we might encounter
+    OpenCVLoader.add_constructor('tag:yaml.org,2002:opencv-matrix', opencv_matrix_constructor)
     OpenCVLoader.add_constructor('!!opencv-matrix', opencv_matrix_constructor)
     
     try:
@@ -47,8 +58,10 @@ def load_drone_config(path):
                     content = content[first_newline+1:]
             return yaml.load(content, Loader=OpenCVLoader)
     except FileNotFoundError:
+        print(f"Could not find config file at {path}")
         return None
     except Exception as e:
+        print(f"Failed to load config file: {e}")
         return None
 
 
@@ -196,21 +209,20 @@ def generate_launch_description():
     # ORB-SLAM3 node - wrapped with environment script to avoid Anaconda conflicts
     orbslam_node = Node(
         package='neural_slam_ros',
-        executable='run_mono_inertial.sh',
-        name='mono_slam_cpp_launcher',
-        arguments=[
-            os.path.join(get_package_prefix('neural_slam_ros'), 'lib', 'neural_slam_ros', 'mono_inertial_node'),
-            '--ros-args',
-            '-r', '__node:=mono_slam_cpp',
-            '-p', f'node_name_arg:=mono_slam_cpp',
-            '-p', f'voc_file_arg:={voc_file_path}',
-            '-p', f'settings_file_path_arg:={config_path}',
-            '-p', 'publish_tf:=true',
-            '-p', f'visualize_trajectory:={visualize_trajectory}',
-            '-p', 'tf_broadcast_rate:=20.0',
-            '-p', 'use_imu:=true',
-            '-p', 'imu_topic:=/mono_py_driver/imu_msg',
-        ],
+        executable='mono_inertial_node',
+        name='mono_slam_cpp',
+        parameters=[{
+            'voc_file_path': voc_file_path,
+            'settings_file_path': config_path,
+            'enable_pangolin': enable_pangolin,
+            'image_topic': image_topic,
+            'imu_topic': imu_topic,
+            'use_imu': use_imu,
+            'visualize_trajectory': visualize_trajectory,
+            'reset_on_failure': reset_on_failure,
+            'tf_broadcast_rate': 20.0,
+            'frame_skipping_enabled': True,
+        }],
         output='screen'
     )
     

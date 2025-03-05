@@ -166,128 +166,75 @@ ros2 topic echo /orb_slam3/trajectory
   mesh_use_embedded_materials: false
 
 
-(neucon) sam3@sam3-dl-1:~/Desktop/Toms_Workspace/active_mapping$ ros2 launch neural_slam_ros neural_slam.launch.py 
-[INFO] [launch]: All log files can be found below /home/sam3/.ros/log/2025-03-05-14-10-06-902963-sam3-dl-1-773592
+(neucon) sam3@sam3-dl-1:~/Desktop/Toms_Workspace/active_mapping$ ./fix_enviroment.sh ros2 launch neural_slam_ros neural_slam.launch.py 
+Running with modified environment...
+LD_LIBRARY_PATH priority: /usr/lib/x86_64-linux-gnu:/usr/local/lib
+[INFO] [launch]: All log files can be found below /home/sam3/.ros/log/2025-03-05-15-00-30-647313-sam3-dl-1-777108
 [INFO] [launch]: Default logging verbosity is set to INFO
 Using configuration from: /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/share/neural_slam_ros/config/EuRoC_mono_inertial.yaml
-Warning: Could not parse configuration from /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/share/neural_slam_ros/config/EuRoC_mono_inertial.yaml, but will use file directly
-[INFO] [mono_inertial_node-1]: process started with pid [773593]
-[INFO] [mono_driver_node.py-2]: process started with pid [773595]
-[INFO] [run_neural_recon.sh-3]: process started with pid [773597]
-[INFO] [rviz2-4]: process started with pid [773599]
-[mono_inertial_node-1] /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/mono_inertial_node: /home/sam3/anaconda3/lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /opt/ros/humble/lib/librclcpp.so)
-[mono_inertial_node-1] /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/mono_inertial_node: /home/sam3/anaconda3/lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /usr/local/lib/libpango_core.so)
-[mono_inertial_node-1] /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/mono_inertial_node: /home/sam3/anaconda3/lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /lib/x86_64-linux-gnu/libgdal.so.30)
-[ERROR] [mono_inertial_node-1]: process has died [pid 773593, exit code 1, cmd '/home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/mono_inertial_node --ros-args -r __node:=mono_slam_cpp --params-file /tmp/launch_params_0nq33tbk'].
-[rviz2-4] [INFO] [1741201807.130857825] [rviz2]: Stereo is NOT SUPPORTED
-[rviz2-4] [INFO] [1741201807.131012934] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
-[rviz2-4] [INFO] [1741201807.163995108] [rviz2]: Stereo is NOT SUPPORTED
-[run_neural_recon.sh-3] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/conv.py:19: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
-[run_neural_recon.sh-3]   @custom_fwd(cast_inputs=torch.half)
-[run_neural_recon.sh-3] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/conv.py:68: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
-[run_neural_recon.sh-3]   def backward(ctx, grad_output: torch.Tensor):
-[run_neural_recon.sh-3] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/devoxelize.py:54: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
-[run_neural_recon.sh-3]   @custom_fwd(cast_inputs=torch.half)
-[run_neural_recon.sh-3] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/devoxelize.py:77: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
-[run_neural_recon.sh-3]   def backward(ctx, grad_output: torch.Tensor):
-[run_neural_recon.sh-3] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/voxelize.py:13: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
-[run_neural_recon.sh-3]   @custom_fwd(cast_inputs=torch.half)
-[run_neural_recon.sh-3] /home/sam3/Desktop/Toms_Workspace/3dreconstruction/torchsparse-1.4/torchsparse/nn/functional/voxelize.py:35: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
-[run_neural_recon.sh-3]   def backward(ctx, grad_output: torch.Tensor):
-[run_neural_recon.sh-3] [INFO] [1741201809.008060578] [neural_recon]: Loading NeuralRecon config from /home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/share/neural_slam_ros/config/neuralrecon.yaml
-[run_neural_recon.sh-3] [ERROR] [1741201809.014847364] [neural_recon]: Error parsing YAML file: could not determine a constructor for the tag 'tag:yaml.org,2002:opencv-matrix'
-[run_neural_recon.sh-3]   in "<unicode string>", line 34, column 13:
-[run_neural_recon.sh-3]     IMU.T_b_c1: !!opencv-matrix
-[run_neural_recon.sh-3]                 ^
-[run_neural_recon.sh-3] [ERROR] [1741201809.015086447] [neural_recon]: Failed to load camera intrinsics: could not determine a constructor for the tag 'tag:yaml.org,2002:opencv-matrix'
-[run_neural_recon.sh-3]   in "<unicode string>", line 34, column 13:
-[run_neural_recon.sh-3]     IMU.T_b_c1: !!opencv-matrix
-[run_neural_recon.sh-3]                 ^
-[run_neural_recon.sh-3] BATCH_SIZE: 1
-[run_neural_recon.sh-3] DATASET: demo
-[run_neural_recon.sh-3] DISTRIBUTED: False
-[run_neural_recon.sh-3] LOADCKPT: 
-[run_neural_recon.sh-3] LOCAL_RANK: 0
-[run_neural_recon.sh-3] LOGDIR: /home/sam3/Desktop/Toms_Workspace/active_mapping/src/neural_slam_ros/checkpoints/model_000047.ckpt
-[run_neural_recon.sh-3] MODE: test
-[run_neural_recon.sh-3] MODEL:
-[run_neural_recon.sh-3]   BACKBONE2D:
-[run_neural_recon.sh-3]     ARC: fpn-mnas-1
-[run_neural_recon.sh-3]   FUSION:
-[run_neural_recon.sh-3]     AVERAGE: False
-[run_neural_recon.sh-3]     FULL: True
-[run_neural_recon.sh-3]     FUSION_ON: True
-[run_neural_recon.sh-3]     HIDDEN_DIM: 64
-[run_neural_recon.sh-3]   LW: [1.0, 0.8, 0.64]
-[run_neural_recon.sh-3]   N_LAYER: 3
-[run_neural_recon.sh-3]   N_VOX: [96, 96, 96]
-[run_neural_recon.sh-3]   PIXEL_MEAN: [103.53, 116.28, 123.675]
-[run_neural_recon.sh-3]   PIXEL_STD: [1.0, 1.0, 1.0]
-[run_neural_recon.sh-3]   POS_WEIGHT: 1.5
-[run_neural_recon.sh-3]   SPARSEREG:
-[run_neural_recon.sh-3]     DROPOUT: False
-[run_neural_recon.sh-3]   TEST_NUM_SAMPLE: [4096, 16384, 65536]
-[run_neural_recon.sh-3]   THRESHOLDS: [0, 0, 0]
-[run_neural_recon.sh-3]   TRAIN_NUM_SAMPLE: [4096, 16384, 65536]
-[run_neural_recon.sh-3]   VOXEL_SIZE: 0.04
-[run_neural_recon.sh-3] OUTPUT_DIR: /home/sam3/Desktop/Toms_Workspace/active_mapping/results/neural_slam
-[run_neural_recon.sh-3] PROJ_MATRIX: True
-[run_neural_recon.sh-3] REDUCE_GPU_MEM: True
-[run_neural_recon.sh-3] RESUME: True
-[run_neural_recon.sh-3] SAVE_FREQ: 1
-[run_neural_recon.sh-3] SAVE_INCREMENTAL: False
-[run_neural_recon.sh-3] SAVE_SCENE_MESH: True
-[run_neural_recon.sh-3] SEED: 1
-[run_neural_recon.sh-3] SUMMARY_FREQ: 20
-[run_neural_recon.sh-3] TEST:
-[run_neural_recon.sh-3]   N_VIEWS: 9
-[run_neural_recon.sh-3]   N_WORKERS: 1
-[run_neural_recon.sh-3]   PATH: /home/sam3/Desktop/Toms_Workspace/active_mapping/src/NeuralRecon/TEST_DATASET/neucon_demodata_b5f1
-[run_neural_recon.sh-3] TRAIN:
-[run_neural_recon.sh-3]   EPOCHS: 40
-[run_neural_recon.sh-3]   LR: 0.001
-[run_neural_recon.sh-3]   LREPOCHS: 12,24,36:2
-[run_neural_recon.sh-3]   N_VIEWS: 5
-[run_neural_recon.sh-3]   N_WORKERS: 8
-[run_neural_recon.sh-3]   PAD_XY_3D: 0.1
-[run_neural_recon.sh-3]   PAD_Z_3D: 0.025
-[run_neural_recon.sh-3]   PATH: 
-[run_neural_recon.sh-3]   RANDOM_ROTATION_3D: True
-[run_neural_recon.sh-3]   RANDOM_TRANSLATION_3D: True
-[run_neural_recon.sh-3]   WD: 0.0
-[run_neural_recon.sh-3] VIS_INCREMENTAL: False
+[INFO] [mono_inertial_node-1]: process started with pid [777109]
+[INFO] [mono_driver_node.py-2]: process started with pid [777111]
+[INFO] [run_neural_recon.sh-3]: process started with pid [777113]
+[INFO] [rviz2-4]: process started with pid [777115]
+[mono_inertial_node-1] [INFO] [1741204830.787670811] [mono_slam_cpp]: 
+[mono_inertial_node-1] ORB-SLAM3 MONOCULAR-INERTIAL NODE STARTED
+[mono_inertial_node-1] [INFO] [1741204830.791239308] [mono_slam_cpp]: nodeName not_given
+[mono_inertial_node-1] [INFO] [1741204830.791264325] [mono_slam_cpp]: voc_file /home/sam3/Desktop/Toms_Workspace/active_mapping/src/ros2_orb_slam3/orb_slam3/Vocabulary/ORBvoc.txt.bin
+[mono_inertial_node-1] [INFO] [1741204830.792465139] [mono_slam_cpp]: IMU subscription enabled on topic: /imu/data
+[mono_inertial_node-1] [INFO] [1741204830.792494768] [mono_slam_cpp]: TF broadcasting enabled at 20.0 Hz
+[mono_inertial_node-1] [INFO] [1741204830.792501125] [mono_slam_cpp]: Waiting to finish handshake ......
+[rviz2-4] [INFO] [1741204830.865522336] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-4] [INFO] [1741204830.865628636] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-4] [INFO] [1741204830.897501589] [rviz2]: Stereo is NOT SUPPORTED
 [run_neural_recon.sh-3] Traceback (most recent call last):
-[run_neural_recon.sh-3]   File "/home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node.py", line 1004, in <module>
-[run_neural_recon.sh-3]     main()
-[run_neural_recon.sh-3]   File "/home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node.py", line 981, in main
-[run_neural_recon.sh-3]     node = NeuralReconNode()
-[run_neural_recon.sh-3]   File "/home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node.py", line 205, in __init__
-[run_neural_recon.sh-3]     self.load_camera_intrinsics(camera_config)
-[run_neural_recon.sh-3]   File "/home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node.py", line 353, in load_camera_intrinsics
-[run_neural_recon.sh-3]     config = yaml.safe_load(content)
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/__init__.py", line 125, in safe_load
-[run_neural_recon.sh-3]     return load(stream, SafeLoader)
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/__init__.py", line 81, in load
-[run_neural_recon.sh-3]     return loader.get_single_data()
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/constructor.py", line 51, in get_single_data
-[run_neural_recon.sh-3]     return self.construct_document(node)
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/constructor.py", line 60, in construct_document
-[run_neural_recon.sh-3]     for dummy in generator:
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/constructor.py", line 413, in construct_yaml_map
-[run_neural_recon.sh-3]     value = self.construct_mapping(node)
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/constructor.py", line 218, in construct_mapping
-[run_neural_recon.sh-3]     return super().construct_mapping(node, deep=deep)
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/constructor.py", line 143, in construct_mapping
-[run_neural_recon.sh-3]     value = self.construct_object(value_node, deep=deep)
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/constructor.py", line 100, in construct_object
-[run_neural_recon.sh-3]     data = constructor(self, node)
-[run_neural_recon.sh-3]   File "/home/sam3/anaconda3/envs/neucon/lib/python3.10/site-packages/yaml/constructor.py", line 427, in construct_undefined
-[run_neural_recon.sh-3]     raise ConstructorError(None, None,
-[run_neural_recon.sh-3] yaml.constructor.ConstructorError: could not determine a constructor for the tag 'tag:yaml.org,2002:opencv-matrix'
-[run_neural_recon.sh-3]   in "<unicode string>", line 34, column 13:
-[run_neural_recon.sh-3]     IMU.T_b_c1: !!opencv-matrix
-[run_neural_recon.sh-3]                 ^
-[INFO] [run_neural_recon.sh-3]: process has finished cleanly [pid 773597]
+[run_neural_recon.sh-3]   File "/home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/neural_recon_node.py", line 15, in <module>
+[run_neural_recon.sh-3]     import torch
+[run_neural_recon.sh-3] ModuleNotFoundError: No module named 'torch'
+[INFO] [run_neural_recon.sh-3]: process has finished cleanly [pid 777113]
+[mono_inertial_node-1] [INFO] [1741204831.129086136] [mono_slam_cpp]: Configuration YAML file name: EuRoC_mono_inertial
+[mono_inertial_node-1] [INFO] [1741204831.129111542] [mono_slam_cpp]: Sent response: ACK
+[mono_inertial_node-1] [INFO] [1741204831.129146661] [mono_slam_cpp]: Path to settings file: /home/sam3/Desktop/Toms_Workspace/active_mapping/src/ros2_orb_slam3/orb_slam3/config/Monocular-Inertial/EuRoC_mono_inertial.yaml
+[mono_inertial_node-1] [INFO] [1741204831.129151930] [mono_slam_cpp]: Using IMU_MONOCULAR mode
+[mono_inertial_node-1] Failed to open settings file at: /home/sam3/Desktop/Toms_Workspace/active_mapping/src/ros2_orb_slam3/orb_slam3/config/Monocular-Inertial/EuRoC_mono_inertial.yaml
+[mono_inertial_node-1] 
+[mono_inertial_node-1] TODO new welcome message
+[mono_inertial_node-1] Input sensor was set to: Monocular-Inertial
+[ERROR] [mono_inertial_node-1]: process has died [pid 777109, exit code 255, cmd '/home/sam3/Desktop/Toms_Workspace/active_mapping/install/neural_slam_ros/lib/neural_slam_ros/mono_inertial_node --ros-args -r __node:=mono_slam_cpp --params-file /tmp/launch_params_8af72jzg'].
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[rviz2-4] [INFO] [1741204858.837954268] [rclcpp]: signal_handler(signum=2)
+[mono_driver_node.py-2] -------------- Received parameters --------------------------
+[mono_driver_node.py-2] 
+[mono_driver_node.py-2] self.settings_name: EuRoC
+[mono_driver_node.py-2] self.image_seq: sample
+[mono_driver_node.py-2] 
+[mono_driver_node.py-2] self.image_sequence_dir: /home/sam3/Desktop/Toms_Workspace/active_mapping/src/ros2_orb_slam3/TEST_DATASET/sample
+[mono_driver_node.py-2] 
+[mono_driver_node.py-2] self.image_seq_dir 
+[mono_driver_node.py-2] len(self.imgz_seqz) 585
+[mono_driver_node.py-2] Found IMU data at: /home/sam3/Desktop/Toms_Workspace/active_mapping/src/ros2_orb_slam3/TEST_DATASET/sample/mav0/imu0/data.csv
+[mono_driver_node.py-2] make sure length is 7
+[mono_driver_node.py-2] Loaded 22721 IMU measurements
+[mono_driver_node.py-2] Configuration to be sent: EuRoC_mono_inertial
+[mono_driver_node.py-2] IMU data available and publisher initialized
+[mono_driver_node.py-2] 
+[mono_driver_node.py-2] MonoDriver initialized, attempting handshake with CPP node
+[mono_driver_node.py-2] Got ack: ACK
+[mono_driver_node.py-2] Handshake complete
+[mono_driver_node.py-2] Traceback (most recent call last):
+[mono_driver_node.py-2]   File "/home/sam3/Desktop/Toms_Workspace/active_mapping/install/ros2_orb_slam3/lib/ros2_orb_slam3/mono_driver_node.py", line 365, in <module>
+[mono_driver_node.py-2]     main()
+[mono_driver_node.py-2]   File "/home/sam3/Desktop/Toms_Workspace/active_mapping/install/ros2_orb_slam3/lib/ros2_orb_slam3/mono_driver_node.py", line 361, in main
+[mono_driver_node.py-2]     rclpy.shutdown()
+[mono_driver_node.py-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 130, in shutdown
+[mono_driver_node.py-2]     _shutdown(context=context)
+[mono_driver_node.py-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/utilities.py", line 58, in shutdown
+[mono_driver_node.py-2]     return context.shutdown()
+[mono_driver_node.py-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/context.py", line 102, in shutdown
+[mono_driver_node.py-2]     self.__context.shutdown()
+[mono_driver_node.py-2] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:241
+[INFO] [rviz2-4]: process has finished cleanly [pid 777115]
+[ERROR] [mono_driver_node.py-2]: process has died [pid 777111, exit code 1, cmd '/home/sam3/Desktop/Toms_Workspace/active_mapping/install/ros2_orb_slam3/lib/ros2_orb_slam3/mono_driver_node.py --ros-args -r __node:=mono_py_driver --params-file /tmp/launch_params_86llzm6a'].
+
 
 
 
