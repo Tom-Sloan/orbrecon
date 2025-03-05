@@ -1,0 +1,13 @@
+echo "/imu/data" && ros2 topic info /imu/data
+echo "/mono_py_driver/exp_settings_ack" && ros2 topic info /mono_py_driver/exp_settings_ack
+echo "/mono_py_driver/experiment_settings" && ros2 topic info /mono_py_driver/experiment_settings
+echo "/mono_py_driver/img_msg" && ros2 topic info /mono_py_driver/img_msg
+echo "/mono_py_driver/timestep_msg" && ros2 topic info /mono_py_driver/timestep_msg
+echo "/neural_recon/mesh" && ros2 topic info /neural_recon/mesh
+echo "/neural_recon/mesh_array" && ros2 topic info /neural_recon/mesh_array
+echo "/neural_recon/status" && ros2 topic info /neural_recon/status
+echo "/orb_slam3/trajectory" && ros2 topic info /orb_slam3/trajectory
+echo "/parameter_events" && ros2 topic info /parameter_events
+echo "/rosout" && ros2 topic info /rosout
+echo "/tf" && ros2 topic info /tf
+echo "/tf_static" && ros2 topic info /tf_static

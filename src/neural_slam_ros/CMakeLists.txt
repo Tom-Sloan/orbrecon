@@ -60,7 +60,7 @@ include_directories(
   ${Pangolin_INCLUDE_DIRS}
 )
 
-# Add C++ executable
+# Add C++ executables
 add_executable(neural_recon_node src/neural_recon_node.cpp)
 target_link_libraries(neural_recon_node
   ${ORB_SLAM3_LIBRARY}
@@ -84,16 +84,41 @@ ament_target_dependencies(neural_recon_node
   message_filters
 )
 
+# Add mono-inertial node executable
+add_executable(mono_inertial_node scripts/mono_inertial_node.cpp)
+target_link_libraries(mono_inertial_node
+  ${ORB_SLAM3_LIBRARY}
+  ${OpenCV_LIBS}
+  ${Eigen3_LIBRARIES}
+  ${Pangolin_LIBRARIES}
+  curl
+  tiff
+)
+ament_target_dependencies(mono_inertial_node
+  rclcpp
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+  visualization_msgs
+  cv_bridge
+  image_transport
+  tf2
+  tf2_ros
+)
+
 # Install Python scripts
 install(PROGRAMS
   scripts/neural_recon_node.py
   scripts/run_neural_recon.sh
+  scripts/mono_driver_node.py
+  scripts/run_mono_inertial.sh
   DESTINATION lib/${PROJECT_NAME}
 )
 
 # Install C++ executables
 install(TARGETS
   neural_recon_node
+  mono_inertial_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

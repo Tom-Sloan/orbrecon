@@ -350,20 +350,44 @@ class NeuralReconNode(Node):
                     first_newline = content.find('\n')
                     if first_newline != -1:
                         content = content[first_newline+1:]
-                config = yaml.safe_load(content)
-            
-            # Check for Camera1 fields first (monocular-inertial format)
-            if 'Camera1.fx' in config:
-                fx = config.get('Camera1.fx', 0.0)
-                fy = config.get('Camera1.fy', 0.0)
-                cx = config.get('Camera1.cx', 0.0)
-                cy = config.get('Camera1.cy', 0.0)
-            # Fall back to Camera fields (monocular format)
-            else:
-                fx = config.get('Camera.fx', 0.0)
-                fy = config.get('Camera.fy', 0.0)
-                cx = config.get('Camera.cx', 0.0)
-                cy = config.get('Camera.cy', 0.0)
+                
+                # Use regex to extract values directly from the file content
+                # to avoid YAML parsing issues with opencv-matrix
+                import re
+                
+                # Try to find Camera1 values (monocular-inertial)
+                fx_match = re.search(r'Camera1\.fx:\s*([\d\.]+)', content)
+                fy_match = re.search(r'Camera1\.fy:\s*([\d\.]+)', content)
+                cx_match = re.search(r'Camera1\.cx:\s*([\d\.]+)', content)
+                cy_match = re.search(r'Camera1\.cy:\s*([\d\.]+)', content)
+                
+                # If found, use those values
+                if fx_match and fy_match and cx_match and cy_match:
+                    fx = float(fx_match.group(1))
+                    fy = float(fy_match.group(1))
+                    cx = float(cx_match.group(1))
+                    cy = float(cy_match.group(1))
+                    self.get_logger().info(f"Found Camera1 intrinsics in config file with regex")
+                else:
+                    # Try Camera values (monocular)
+                    fx_match = re.search(r'Camera\.fx:\s*([\d\.]+)', content)
+                    fy_match = re.search(r'Camera\.fy:\s*([\d\.]+)', content)
+                    cx_match = re.search(r'Camera\.cx:\s*([\d\.]+)', content)
+                    cy_match = re.search(r'Camera\.cy:\s*([\d\.]+)', content)
+                    
+                    if fx_match and fy_match and cx_match and cy_match:
+                        fx = float(fx_match.group(1))
+                        fy = float(fy_match.group(1))
+                        cx = float(cx_match.group(1))
+                        cy = float(cy_match.group(1))
+                        self.get_logger().info(f"Found Camera intrinsics in config file with regex")
+                    else:
+                        # Fall back to default EuRoC values
+                        self.get_logger().warn("Could not find camera parameters in config, using EuRoC defaults")
+                        fx = 458.654
+                        fy = 457.296
+                        cx = 367.215
+                        cy = 248.375
             
             # Check if we have valid intrinsics
             if fx <= 0 or fy <= 0:
@@ -473,20 +497,32 @@ class NeuralReconNode(Node):
     def image_callback(self, msg):
         """Callback for camera images"""
         try:
+            # Check if we should use fallback conversion (controlled by environment variable)
+            use_fallback = os.environ.get('CV_BRIDGE_FORCE_FALLBACK', '0') == '1'
+            
             # Convert ROS image to OpenCV
-            try:
-                # Get image encoding from message
-                encoding = msg.encoding if hasattr(msg, 'encoding') and msg.encoding else "rgb8"
-                cv_image = self.bridge.imgmsg_to_cv2(msg, encoding)
-            except ImportError as e:
-                # Fallback to direct conversion if cv_bridge fails
-                self.get_logger().warn(f"cv_bridge import error: {e}. Using fallback conversion.")
+            if use_fallback:
+                # Always use fallback conversion if requested
                 import numpy as np
                 # Create numpy array from bytes
                 img_data = np.frombuffer(msg.data, dtype=np.uint8)
                 # Reshape based on height, width, and channels
                 channels = 3  # Assume RGB
                 cv_image = img_data.reshape(msg.height, msg.width, channels)
+            else:
+                try:
+                    # Get image encoding from message
+                    encoding = msg.encoding if hasattr(msg, 'encoding') and msg.encoding else "rgb8"
+                    cv_image = self.bridge.imgmsg_to_cv2(msg, encoding)
+                except ImportError as e:
+                    # Fallback to direct conversion if cv_bridge fails
+                    self.get_logger().warn(f"cv_bridge import error: {e}. Using fallback conversion.")
+                    import numpy as np
+                    # Create numpy array from bytes
+                    img_data = np.frombuffer(msg.data, dtype=np.uint8)
+                    # Reshape based on height, width, and channels
+                    channels = 3  # Assume RGB
+                    cv_image = img_data.reshape(msg.height, msg.width, channels)
             
             # Try to get the camera pose from tf
             try:
@@ -716,6 +752,7 @@ class NeuralReconNode(Node):
     def save_reconstruction(self):
         """Save the current reconstruction"""
         with self.tsdf_lock:
+            print("Saving reconstruction")
             if self.tsdf_volume is None:
                 self.get_logger().warning("No reconstruction to save")
                 return False

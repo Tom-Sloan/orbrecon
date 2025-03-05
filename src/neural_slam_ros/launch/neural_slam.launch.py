@@ -10,6 +10,7 @@ from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from ament_index_python.packages import get_package_prefix
 
 # Define helpers for config loading directly in launch file
 class OpenCVMatrix:
@@ -81,8 +82,8 @@ def generate_launch_description():
     # Declare basic arguments
     declare_use_imu = DeclareLaunchArgument(
         'use_imu',
-        default_value='true',
-        description='Use IMU data for better pose estimation'
+        default_value='true',  # Always use IMU for better tracking
+        description='Use IMU data for better pose estimation (should be true for mono-inertial)'
     )
     
     declare_image_topic = DeclareLaunchArgument(
@@ -170,38 +171,46 @@ def generate_launch_description():
         description='Reset SLAM system after consecutive tracking failures'
     )
     
-    # Load the appropriate config file
+    # Use the neural_slam_ros EuRoC_mono_inertial.yaml file as requested
     config_path = os.path.join(
-        get_package_share_directory('neural_slam_ros'),
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         'config',
-        'EuRoC_mono_inertial.yaml' if use_imu == 'true' else 'EuRoC_mono.yaml'
+        'EuRoC_mono_inertial.yaml'
     )
+    
+    # Verify that the config file exists
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Could not find EuRoC_mono_inertial.yaml at {config_path}")
+    
+    # Log the config path for debugging
+    print(f"Using configuration from: {config_path}")
     
     # Load config with OpenCV matrix support
     config = load_drone_config(config_path)
     if config is None:
-        raise RuntimeError(f"Failed to load configuration from {config_path}")
+        print(f"Warning: Could not parse configuration from {config_path}, but will use file directly")
     
     # Path to neural reconstruction config
     neural_config_path = PathJoinSubstitution([package_dir, 'config', config_file])
     
-    # ORB-SLAM3 node
+    # ORB-SLAM3 node - wrapped with environment script to avoid Anaconda conflicts
     orbslam_node = Node(
         package='neural_slam_ros',
-        executable='neural_recon_node',
-        name='neural_recon_bridge',
-        parameters=[{
-            'voc_file_path': voc_file_path,
-            'settings_file_path': config_path,
-            'enable_pangolin': enable_pangolin,
-            'image_topic': image_topic,
-            'imu_topic': imu_topic,
-            'use_imu': use_imu,
-            'visualize_trajectory': visualize_trajectory,
-            'reset_on_failure': reset_on_failure,
-            'tf_broadcast_rate': 20.0,
-            'frame_skipping_enabled': True,
-        }],
+        executable='run_mono_inertial.sh',
+        name='mono_slam_cpp_launcher',
+        arguments=[
+            os.path.join(get_package_prefix('neural_slam_ros'), 'lib', 'neural_slam_ros', 'mono_inertial_node'),
+            '--ros-args',
+            '-r', '__node:=mono_slam_cpp',
+            '-p', f'node_name_arg:=mono_slam_cpp',
+            '-p', f'voc_file_arg:={voc_file_path}',
+            '-p', f'settings_file_path_arg:={config_path}',
+            '-p', 'publish_tf:=true',
+            '-p', f'visualize_trajectory:={visualize_trajectory}',
+            '-p', 'tf_broadcast_rate:=20.0',
+            '-p', 'use_imu:=true',
+            '-p', 'imu_topic:=/mono_py_driver/imu_msg',
+        ],
         output='screen'
     )
     
@@ -240,6 +249,18 @@ def generate_launch_description():
         output='screen'
     )
     
+    # Create mono driver node
+    mono_driver_node = Node(
+        package='ros2_orb_slam3',  # Use original version
+        executable='mono_driver_node.py',
+        name='mono_py_driver',
+        parameters=[{
+            'settings_name': 'EuRoC',  # Use EuRoC for the original driver
+            'image_seq': 'sample'
+        }],
+        output='screen'
+    )
+    
     # Create the launch description and add actions
     ld = LaunchDescription()
     
@@ -264,6 +285,7 @@ def generate_launch_description():
     
     # Add nodes
     ld.add_action(orbslam_node)
+    ld.add_action(mono_driver_node)
     ld.add_action(neuralrecon_node)
     
     # Add RViz if config exists
